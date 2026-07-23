@@ -42,7 +42,7 @@ class Settings:
                 "DASHSCOPE_BASE_URL",
                 "https://dashscope.aliyuncs.com/compatible-mode/v1",
             ).rstrip("/"),
-            qwen_vl_model=os.getenv("QWEN_VL_MODEL", "qwen3-vl-plus").strip(),
+            qwen_vl_model=os.getenv("QWEN_VL_MODEL", "").strip(),
             allowed_user_ids=allowed,
             max_article_images=max(1, min(int(os.getenv("MAX_ARTICLE_IMAGES", "8")), 20)),
             request_timeout_seconds=max(5, int(os.getenv("REQUEST_TIMEOUT_SECONDS", "20"))),
@@ -63,6 +63,12 @@ class Settings:
             and (self.feishu_spreadsheet_token or self.feishu_wiki_node_token)
         )
 
-    def require_api_key(self) -> None:
+    def require_ai_config(self) -> None:
+        missing = []
         if not self.dashscope_api_key:
-            raise RuntimeError("缺少 DASHSCOPE_API_KEY，请复制 .env.example 为 .env 并填写新密钥。")
+            missing.append("DASHSCOPE_API_KEY")
+        if not self.qwen_vl_model:
+            missing.append("QWEN_VL_MODEL")
+        if missing:
+            names = "、".join(missing)
+            raise RuntimeError(f"缺少 {names}，请复制 .env.example 为 .env 并填写。")

@@ -6,17 +6,24 @@
 
 ## 1. 准备
 
-原代码中的 DashScope Key 已暴露，请先在阿里云控制台删除它并创建新 Key。
-
 ```bash
-cd "/Users/chenruizhao/Documents/微信机器人"
+git clone https://github.com/chuichuizhao/wechat-recruit-bot.git
+cd wechat-recruit-bot
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
 cp .env.example .env
 ```
 
-如果目前只需要接收消息，`.env` 中的 `DASHSCOPE_API_KEY` 可以留空；需要自动整理招聘信息时再填写。
+如果目前只需要接收消息，AI 相关配置可以留空；需要自动整理招聘信息时，在 `.env` 中明确填写：
+
+```text
+DASHSCOPE_API_KEY=你的API密钥
+DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+QWEN_VL_MODEL=你要使用的视觉语言模型名称
+```
+
+项目不会在代码中指定默认模型。`QWEN_VL_MODEL` 应填写你的 DashScope 账号当前可用、且支持图片输入的模型名称。
 
 ## 2. 先测试招聘识别
 

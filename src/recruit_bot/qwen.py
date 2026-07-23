@@ -102,7 +102,7 @@ def normalize_apply_contact(value: object) -> str:
 
 class QwenRecruitmentAnalyzer:
     def __init__(self, settings: Settings) -> None:
-        settings.require_api_key()
+        settings.require_ai_config()
         self.model = settings.qwen_vl_model
         self.client = OpenAI(
             api_key=settings.dashscope_api_key,
