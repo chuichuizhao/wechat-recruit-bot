@@ -16,6 +16,12 @@ class Settings:
     max_article_images: int
     request_timeout_seconds: int
     data_dir: Path
+    feishu_app_id: str
+    feishu_app_secret: str
+    feishu_spreadsheet_token: str
+    feishu_sheet_id: str
+    feishu_wiki_node_token: str
+    feishu_spreadsheet_url: str
 
     @classmethod
     def load(cls) -> "Settings":
@@ -26,6 +32,10 @@ class Settings:
             for item in os.getenv("ALLOWED_USER_IDS", "").split(",")
             if item.strip()
         )
+        wiki_node_token = os.getenv("FEISHU_WIKI_NODE_TOKEN", "").strip()
+        spreadsheet_url = os.getenv("FEISHU_SPREADSHEET_URL", "").strip()
+        if not spreadsheet_url and wiki_node_token:
+            spreadsheet_url = f"https://my.feishu.cn/wiki/{wiki_node_token}?from=from_copylink"
         return cls(
             dashscope_api_key=os.getenv("DASHSCOPE_API_KEY", "").strip(),
             dashscope_base_url=os.getenv(
@@ -37,6 +47,20 @@ class Settings:
             max_article_images=max(1, min(int(os.getenv("MAX_ARTICLE_IMAGES", "8")), 20)),
             request_timeout_seconds=max(5, int(os.getenv("REQUEST_TIMEOUT_SECONDS", "20"))),
             data_dir=project_root / ".data",
+            feishu_app_id=os.getenv("FEISHU_APP_ID", "").strip(),
+            feishu_app_secret=os.getenv("FEISHU_APP_SECRET", "").strip(),
+            feishu_spreadsheet_token=os.getenv("FEISHU_SPREADSHEET_TOKEN", "").strip(),
+            feishu_sheet_id=os.getenv("FEISHU_SHEET_ID", "").strip(),
+            feishu_wiki_node_token=wiki_node_token,
+            feishu_spreadsheet_url=spreadsheet_url,
+        )
+
+    @property
+    def feishu_configured(self) -> bool:
+        return bool(
+            self.feishu_app_id
+            and self.feishu_app_secret
+            and (self.feishu_spreadsheet_token or self.feishu_wiki_node_token)
         )
 
     def require_api_key(self) -> None:

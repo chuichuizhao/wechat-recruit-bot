@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from io import BytesIO
+import time
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -28,7 +29,33 @@ class WeChatArticleReader:
         self.timeout = timeout
         self.max_images = max_images
         self.session = requests.Session()
-        self.session.headers.update({"User-Agent": IPHONE_USER_AGENT})
+        self.session.headers.update(
+            {
+                "User-Agent": IPHONE_USER_AGENT,
+                "Accept": "text/html,application/xhtml+xml,image/avif,image/webp,*/*",
+                "Accept-Language": "zh-CN,zh;q=0.9",
+            }
+        )
+
+    def _get_with_retry(self, url: str, **kwargs) -> requests.Response:
+        """Retry transient disconnects frequently returned by mp.weixin.qq.com."""
+        last_error: requests.RequestException | None = None
+        for attempt in range(3):
+            try:
+                response = self.session.get(
+                    url,
+                    timeout=self.timeout,
+                    **kwargs,
+                )
+                response.raise_for_status()
+                return response
+            except requests.RequestException as error:
+                last_error = error
+                self.session.close()
+                if attempt < 2:
+                    time.sleep(attempt + 1)
+
+        raise ValueError("公众号页面连接失败，已自动重试 3 次，请稍后重新发送链接。") from last_error
 
     @staticmethod
     def validate_url(url: str) -> str:
@@ -39,8 +66,7 @@ class WeChatArticleReader:
 
     def read(self, url: str) -> Article:
         safe_url = self.validate_url(url)
-        response = self.session.get(safe_url, timeout=self.timeout)
-        response.raise_for_status()
+        response = self._get_with_retry(safe_url)
         if urlparse(response.url).hostname != "mp.weixin.qq.com":
             raise ValueError("公众号链接跳转到了不受支持的站点。")
         response.encoding = response.apparent_encoding or "utf-8"
@@ -69,12 +95,10 @@ class WeChatArticleReader:
         return Article(title=title, text=text[:20_000], image_urls=tuple(image_urls), source_url=safe_url)
 
     def download_image(self, url: str) -> tuple[bytes, str]:
-        response = self.session.get(
+        response = self._get_with_retry(
             url,
             headers={"Referer": "https://mp.weixin.qq.com/"},
-            timeout=self.timeout,
         )
-        response.raise_for_status()
         if len(response.content) > 12 * 1024 * 1024:
             raise ValueError("图片超过 12MB，已跳过。")
 

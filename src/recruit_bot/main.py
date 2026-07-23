@@ -4,6 +4,7 @@ import argparse
 
 from .bot import run_bot
 from .config import Settings
+from .feishu import FeishuSpreadsheetStore
 from .qwen import QwenRecruitmentAnalyzer
 from .service import RecruitmentService
 from .wechat_article import WeChatArticleReader
@@ -25,11 +26,22 @@ def main() -> None:
     args = parser.parse_args()
 
     settings = Settings.load()
-    service = build_service(settings)
     if args.bot:
-        run_bot(settings, service)
+        service = build_service(settings) if settings.dashscope_api_key else None
+        feishu = None
+        if settings.feishu_configured:
+            feishu = FeishuSpreadsheetStore(
+                settings.feishu_app_id,
+                settings.feishu_app_secret,
+                settings.feishu_spreadsheet_token,
+                settings.feishu_sheet_id,
+                settings.feishu_wiki_node_token,
+                settings.request_timeout_seconds,
+            )
+        run_bot(settings, service, feishu)
         return
 
+    service = build_service(settings)
     source = args.text or args.url or ""
     print(service.process(source).format_for_wechat())
 

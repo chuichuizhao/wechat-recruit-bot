@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import base64
+import ast
 import json
+import re
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 from openai import OpenAI
 
@@ -12,6 +15,7 @@ from .config import Settings
 SYSTEM_PROMPT = """你是专业的招聘信息整理助手。只依据用户提供的文字和图片提取信息，不要猜测。
 必须返回合法 JSON，字段固定为：公司、类别、岗位、地点、投递网址、截止时间、摘要、信息缺失。
 类别只能是“实习生招聘”“校园招聘”“社会招聘”或“未知”。岗位、地点、信息缺失是字符串数组。
+“投递网址”必须是单个字符串，不能返回数组。原文给出网址时填写网址，给出邮箱时填写邮箱；不要把公众号文章链接或公众号名称误认为投递地址。
 时间范围取与报名或投递相关的结束日期；不要把面试或入职时间误认为截止日期。未知字段使用“未知”或空数组。"""
 
 
@@ -33,27 +37,67 @@ class RecruitmentSummary:
             category=str(data.get("类别") or "未知"),
             jobs=tuple(str(x) for x in (data.get("岗位") or []) if x),
             locations=tuple(str(x) for x in (data.get("地点") or []) if x),
-            apply_url=str(data.get("投递网址") or "未知"),
+            apply_url=normalize_apply_contact(data.get("投递网址")),
             deadline=str(data.get("截止时间") or "未知"),
             summary=str(data.get("摘要") or ""),
             missing=tuple(str(x) for x in (data.get("信息缺失") or []) if x),
         )
 
     def format_for_wechat(self) -> str:
-        jobs = "\n".join(f"• {job}" for job in self.jobs) or "未知"
-        locations = "、".join(self.locations) or "未知"
-        missing = "、".join(self.missing) or "无"
+        # Blank lines are intentional: some WeChat clients visually collapse a
+        # single line break when text is copied or forwarded.
+        jobs = "\n\n".join(f"• {job}" for job in self.jobs) or "未知"
         return (
-            f"【招聘整理】\n"
-            f"公司：{self.company}\n"
-            f"类别：{self.category}\n"
-            f"地点：{locations}\n"
-            f"截止时间：{self.deadline}\n"
+            f"【招聘整理】\n\n"
+            f"公司：{self.company}\n\n"
+            f"类别：{self.category}\n\n"
+            f"截止时间：{self.deadline}\n\n"
             f"投递地址：{self.apply_url}\n\n"
-            f"岗位：\n{jobs}\n\n"
-            f"摘要：{self.summary or '未知'}\n"
-            f"缺失信息：{missing}"
+            f"岗位：\n\n{jobs}"
         )
+
+
+def normalize_apply_contact(value: object) -> str:
+    def flatten(item: object) -> list[str]:
+        if item is None:
+            return []
+        if isinstance(item, dict):
+            preferred_keys = ("url", "link", "email", "text", "value")
+            preferred = [item[key] for key in preferred_keys if item.get(key)]
+            return [text for child in preferred for text in flatten(child)]
+        if isinstance(item, (list, tuple, set)):
+            return [text for child in item for text in flatten(child)]
+        text = str(item).strip()
+        if text.startswith(("[", "{")):
+            try:
+                parsed = ast.literal_eval(text)
+            except (ValueError, SyntaxError):
+                pass
+            else:
+                if parsed != item:
+                    return flatten(parsed)
+        return [text] if text else []
+
+    candidates = flatten(value)
+
+    urls: list[str] = []
+    emails: list[str] = []
+    other: list[str] = []
+    for candidate in candidates:
+        url_match = re.search(r"https?://[^\s'\"\],]+", candidate)
+        if url_match:
+            url = url_match.group(0)
+            if urlparse(url).hostname != "mp.weixin.qq.com":
+                urls.append(url)
+            continue
+        email_match = re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", candidate)
+        if email_match:
+            emails.append(email_match.group(0))
+            continue
+        if "公众号" not in candidate and candidate not in {"未知", "无", "[", "]", "{", "}"}:
+            other.append(candidate)
+
+    return (urls or emails or other or ["未知"])[0]
 
 
 class QwenRecruitmentAnalyzer:
@@ -65,17 +109,40 @@ class QwenRecruitmentAnalyzer:
             base_url=settings.dashscope_base_url,
         )
 
+    def analyze_text(self, text: str) -> RecruitmentSummary:
+        return self.analyze(
+            text,
+            source_instruction=(
+                "这是用户直接发送的招聘文字。请从文字中提取信息；"
+                "若提供简历投递邮箱，将邮箱填入投递网址字段。"
+            ),
+        )
+
+    def analyze_article(
+        self,
+        text: str,
+        images: list[tuple[bytes, str]],
+        source_url: str,
+    ) -> RecruitmentSummary:
+        return self.analyze(
+            text,
+            images,
+            source_url,
+            source_instruction="这是微信公众号文章，请结合正文和图片提取招聘信息。",
+        )
+
     def analyze(
         self,
         text: str,
         images: list[tuple[bytes, str]] | None = None,
         source_url: str = "",
+        source_instruction: str = "请提取招聘信息。",
     ) -> RecruitmentSummary:
         content: list[dict] = [
             {
                 "type": "text",
                 "text": (
-                    "请提取以下招聘信息并输出 JSON。\n"
+                    f"{source_instruction}\n请提取以下招聘信息并输出 JSON。\n"
                     f"来源：{source_url or '用户直接发送'}\n"
                     f"正文：\n{text[:20_000]}"
                 ),

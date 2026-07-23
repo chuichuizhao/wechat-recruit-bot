@@ -16,7 +16,7 @@ pip install -e '.[dev]'
 cp .env.example .env
 ```
 
-打开 `.env`，填写新的 `DASHSCOPE_API_KEY`。
+如果目前只需要接收消息，`.env` 中的 `DASHSCOPE_API_KEY` 可以留空；需要自动整理招聘信息时再填写。
 
 ## 2. 先测试招聘识别
 
@@ -33,6 +33,8 @@ python -m recruit_bot.main --bot
 
 首次运行会显示二维码。扫码后向机器人发送招聘文字或公众号链接。凭证保存在项目的 `.data/` 中，不会进入 Git。
 
+机器人会把每条文字或公众号链接追加保存到 `.data/inbox.jsonl`，并回复一个 8 位接收编号。配置了 `DASHSCOPE_API_KEY` 时，还会继续提取并回复招聘信息；未配置时仅负责可靠接收。
+
 首次收到消息时，终端会打印发送者 ID。把自己的 ID 写入 `.env`：
 
 ```text
@@ -40,6 +42,22 @@ ALLOWED_USER_IDS=你的发送者ID
 ```
 
 重启后机器人只响应允许列表中的用户。多个 ID 用英文逗号分隔。
+
+## 4. 自动保存到飞书电子表格（可选）
+
+1. 新建飞书电子表格，在第一行依次填写：`公司`、`类别`、`截止时间`、`投递地址`、`岗位`。
+2. 在飞书开放平台创建企业自建应用，开通电子表格读写权限，并让该应用能够访问目标电子表格。
+3. 从电子表格网址中取得 `spreadsheet_token`（`/sheets/` 后面的部分）和 `sheet_id`（网址中的 `sheet` 参数）。
+4. 把配置写入本机 `.env`，不要把 App Secret 发给他人：
+
+```text
+FEISHU_APP_ID=
+FEISHU_APP_SECRET=
+FEISHU_SPREADSHEET_TOKEN=
+FEISHU_SHEET_ID=
+```
+
+四项均填写后重启机器人。启动日志出现“飞书同步已启用”即表示配置已加载；每次招聘整理成功后，机器人会在电子表格末尾追加一行。
 
 ## 安全限制
 

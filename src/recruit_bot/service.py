@@ -21,7 +21,7 @@ class RecruitmentService:
 
         match = WECHAT_URL_PATTERN.search(cleaned)
         if not match:
-            return self.analyzer.analyze(cleaned)
+            return self.analyzer.analyze_text(cleaned)
 
         article = self.reader.read(match.group(0).rstrip("。），,)]"))
         images: list[tuple[bytes, str]] = []
@@ -32,4 +32,4 @@ class RecruitmentService:
                 print(f"跳过图片 {image_url}: {error}")
 
         article_text = f"标题：{article.title}\n{article.text}"
-        return self.analyzer.analyze(article_text, images, article.source_url)
+        return self.analyzer.analyze_article(article_text, images, article.source_url)
