@@ -19,20 +19,13 @@ cp .env.example .env
 
 ```text
 DASHSCOPE_API_KEY=你的API密钥
-DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+DASHSCOPE_BASE_URL=你的API兼容接口地址
 QWEN_VL_MODEL=你要使用的视觉语言模型名称
 ```
 
-项目不会在代码中指定默认模型。`QWEN_VL_MODEL` 应填写你的 DashScope 账号当前可用、且支持图片输入的模型名称。
+项目不会在代码中指定默认接口地址或模型。请根据服务商文档填写 `DASHSCOPE_BASE_URL`；`QWEN_VL_MODEL` 应填写你的账号当前可用、且支持图片输入的模型名称。
 
-## 2. 先测试招聘识别
-
-```bash
-python -m recruit_bot.main --text "某公司招聘产品经理，工作地点上海，7月30日截止"
-python -m recruit_bot.main --url "https://mp.weixin.qq.com/s/..."
-```
-
-## 3. 启动微信机器人
+## 2. 启动微信机器人
 
 ```bash
 python -m recruit_bot.main --bot
@@ -50,7 +43,7 @@ ALLOWED_USER_IDS=你的发送者ID
 
 重启后机器人只响应允许列表中的用户。多个 ID 用英文逗号分隔。
 
-## 4. 自动保存到飞书电子表格（可选）
+## 3. 自动保存到飞书电子表格（可选）
 
 1. 新建飞书电子表格，在第一行依次填写：`公司`、`类别`、`截止时间`、`投递地址`、`岗位`。
 2. 在飞书开放平台创建企业自建应用，开通电子表格读写权限，并让该应用能够访问目标电子表格。

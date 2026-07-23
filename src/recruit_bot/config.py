@@ -38,10 +38,7 @@ class Settings:
             spreadsheet_url = f"https://my.feishu.cn/wiki/{wiki_node_token}?from=from_copylink"
         return cls(
             dashscope_api_key=os.getenv("DASHSCOPE_API_KEY", "").strip(),
-            dashscope_base_url=os.getenv(
-                "DASHSCOPE_BASE_URL",
-                "https://dashscope.aliyuncs.com/compatible-mode/v1",
-            ).rstrip("/"),
+            dashscope_base_url=os.getenv("DASHSCOPE_BASE_URL", "").strip().rstrip("/"),
             qwen_vl_model=os.getenv("QWEN_VL_MODEL", "").strip(),
             allowed_user_ids=allowed,
             max_article_images=max(1, min(int(os.getenv("MAX_ARTICLE_IMAGES", "8")), 20)),
@@ -67,6 +64,8 @@ class Settings:
         missing = []
         if not self.dashscope_api_key:
             missing.append("DASHSCOPE_API_KEY")
+        if not self.dashscope_base_url:
+            missing.append("DASHSCOPE_BASE_URL")
         if not self.qwen_vl_model:
             missing.append("QWEN_VL_MODEL")
         if missing:
